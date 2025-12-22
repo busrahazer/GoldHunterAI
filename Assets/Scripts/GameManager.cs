@@ -84,5 +84,11 @@ public class GameManager : MonoBehaviour
             Debug.Log("AI KAZANDI!");
         else
             Debug.Log("BERABERE!");
+
+        // GA'ya AI skorunu bildir
+        if (GAManager.instance != null)
+        {
+            GAManager.instance.RecordGameResult(aiScore);
+        }  
     }
 }
