@@ -32,11 +32,21 @@ public class RopeCollision : MonoBehaviour
             Debug.Log("Collectible bulundu!");
             hasCollected = true;
             
-            // Oyuncu mu AI mı kontrol et
-            bool isPlayer = (launcher != null && launcher.launchKey == KeyCode.Space);
+            // Parent isminden Player/AI ayırt et
+            Transform parent = transform.parent;
+            bool isPlayer = parent.name.Contains("Player"); // "Player" kelimesi var mı?
             
-            Debug.Log("Puan ekleniyor: " + collectible.pointValue + " (Player: " + isPlayer + ")");
-            
+            Debug.Log($"{collectible.objectType} toplandı! Parent: {parent.name} | isPlayer: {isPlayer}");
+        
+            // Q-Learning Agent'a ödül ver
+            QLearningAgent qAgent = GetComponentInParent<QLearningAgent>();
+            if (qAgent != null)
+            {
+                if (collectible.objectType == "gold")
+                    qAgent.OnGoldCollected(collectible.pointValue);
+                else
+                    qAgent.OnRockCollected(collectible.pointValue);
+            }
             // Skoru ekle
             if (GameManager.instance != null)
             {

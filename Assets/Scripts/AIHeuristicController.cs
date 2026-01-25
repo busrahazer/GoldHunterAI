@@ -31,9 +31,18 @@ public class AIHeuristicController : MonoBehaviour
     
     void Update()
     {
+        // Oyun bittiyse karar verme
+        if (GameManager.instance != null && !GameManager.instance.IsGameActive)
+        return;
         // Eğer ip fırlatılmışsa karar verme
         if (launcher.IsLaunched())
             return;
+        
+        // DESTROY EDİLMİŞ HEDEF KONTROLÜ
+        if (currentTarget == null)
+        {
+            currentTarget = null;
+        }
         
         // Karar zamanlayıcısı
         decisionTimer += Time.deltaTime;
@@ -67,6 +76,10 @@ public class AIHeuristicController : MonoBehaviour
         
         foreach (CollectibleObject target in targets)
         {
+            if (target == null || target.gameObject == null)
+            {
+                continue; // Yoksa hesaplama yapma, sıradakine geç
+            }
             float score = CalculateHeuristicScore(target);
             
             if (score > bestScore)
@@ -84,7 +97,7 @@ public class AIHeuristicController : MonoBehaviour
             Vector2 direction = currentTarget.transform.position - transform.position;
             targetAngle = Mathf.Atan2(direction.x, -direction.y) * Mathf.Rad2Deg;
             
-            Debug.Log($"AI Hedef seçti: {currentTarget.objectType} | Skor: {bestScore:F2} | Açı: {targetAngle:F1}°");
+            // Debug.Log($"AI Hedef seçti: {currentTarget.objectType} | Skor: {bestScore:F2} | Açı: {targetAngle:F1}°");
         }
     }
     
@@ -115,7 +128,7 @@ public class AIHeuristicController : MonoBehaviour
         // Eğer ip hedefe yakın açıdaysa ateş et
         if (angleDifference < 5f) // 5 derece tolerans
         {
-            Debug.Log($"AI Ateş ediyor! Açı: {currentRopeAngle:F1}° | Hedef açı: {targetAngle:F1}°");
+            // Debug.Log($"AI Ateş ediyor! Açı: {currentRopeAngle:F1}° | Hedef açı: {targetAngle:F1}°");
             launcher.LaunchRope();
             currentTarget = null; // Hedefi sıfırla
         }

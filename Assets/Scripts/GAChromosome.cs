@@ -32,9 +32,9 @@ public class GAChromosome
     public static GAChromosome CreateRandom()
     {
         return new GAChromosome(
-            Random.Range(0.5f, 2.5f),
-            Random.Range(0.5f, 2.5f),
-            Random.Range(0.5f, 2.5f)
+            Random.Range(0.1f, 5f),
+            Random.Range(0.1f, 5f),
+            Random.Range(0.1f, 5f)
         );
     }
     
@@ -47,7 +47,7 @@ public class GAChromosome
         };
     }
     
-    // İki kromozomu çaprazla (crossover)
+    // İki kromozomu çaprazla 
     public static GAChromosome Crossover(GAChromosome parent1, GAChromosome parent2)
     {
         return new GAChromosome(

@@ -4,51 +4,53 @@ using System.Linq;
 
 public class GAManager : MonoBehaviour
 {
-    // === SINGLETON ===
     public static GAManager instance;
     
-    // === REFERANSLAR ===
     public AIHeuristicController aiController;
     
-    // === GA AYARLARI ===
     [Header("GA Settings")]
-    public int populationSize = 10;           // Küçük başlayalım
-    public float mutationRate = 0.3f;         // %30 mutasyon
-    public float mutationAmount = 0.5f;       // Mutasyon miktarı
-    public int elitismCount = 2;              // En iyi 2 birey korunur
+    public int populationSize = 20;
+    public float mutationRate = 0.3f;
+    public float mutationAmount = 0.5f;
+    public int elitismCount = 2;
     
-    // === POPÜLASYON ===
     private List<GAChromosome> population = new List<GAChromosome>();
-    private int currentGeneration = 0;
+    public int currentGeneration = 0;
+    private int currentIndividualIndex = 0; // Hangi birey test ediliyor?
     
-    // === İSTATİSTİKLER ===
-    [Header("Statistics (Read Only)")]
+    [Header("Statistics")]
     public float bestFitnessEver = 0f;
     public float currentGenerationBest = 0f;
     public float currentGenerationAvg = 0f;
     
     private GAChromosome bestChromosomeEver;
+    private List<float> fitnessHistory = new List<float>(); // Tüm fitness geçmişi
     
     void Awake()
     {
         if (instance == null)
+        {
             instance = this;
+            DontDestroyOnLoad(gameObject); // Sahne değişse de kaybolmasın
+        }
         else
+        {
             Destroy(gameObject);
+        }
     }
     
     void Start()
     {
         InitializePopulation();
-        LoadBestChromosome();
+        LoadNextIndividual();
     }
     
-    // İlk popülasyonu oluştur
     void InitializePopulation()
     {
+        if (population.Count > 0) return; // Zaten var
+        
         population.Clear();
         
-        // Rastgele kromozomlar oluştur
         for (int i = 0; i < populationSize; i++)
         {
             population.Add(GAChromosome.CreateRandom());
@@ -57,108 +59,80 @@ public class GAManager : MonoBehaviour
         Debug.Log($" GA Başlatıldı | Popülasyon: {populationSize} | Nesil: {currentGeneration}");
     }
     
-    // En iyi kromozomu AI'a yükle (oyun başında)
-    void LoadBestChromosome()
+    void LoadNextIndividual()
     {
-        if (population.Count == 0) return;
-        
-        // İlk başta popülasyondan rastgele birini seç
-        GAChromosome firstChromosome = population[Random.Range(0, population.Count)];
-        
-        if (bestChromosomeEver != null)
+        if (currentIndividualIndex >= population.Count)
         {
-            // Eğer daha önce eğitim yapılmışsa, en iyiyi kullan
-            ApplyChromosome(bestChromosomeEver);
-            Debug.Log($" En iyi öğrenilmiş kromozom yüklendi: {bestChromosomeEver}");
+            // Tüm bireyler test edildi, evrim zamanı
+            EvolvePopulation();
+            currentIndividualIndex = 0;
+            currentGeneration++;
         }
-        else
-        {
-            // İlk oyunda rastgele kromozom
-            ApplyChromosome(firstChromosome);
-            Debug.Log($" İlk kromozom yüklendi: {firstChromosome}");
-        }
+        
+        GAChromosome current = population[currentIndividualIndex];
+        ApplyChromosome(current);
+        
+        Debug.Log($"🧬 Birey {currentIndividualIndex + 1}/{populationSize} yüklendi | Nesil: {currentGeneration}");
     }
     
-    // Kromozomu AI'a uygula
     void ApplyChromosome(GAChromosome chromosome)
     {
+        if (aiController == null)
+        {
+            Debug.LogError("❌ AI Controller bağlı değil!");
+            return;
+        }
+        
         aiController.valueWeight = chromosome.valueWeight;
         aiController.distanceWeight = chromosome.distanceWeight;
         aiController.weightPenalty = chromosome.weightPenalty;
     }
     
-    // Oyun bittiğinde fitness kaydet
     public void RecordGameResult(int aiScore)
     {
-        // Şu anki kromozoma fitness ata
-        GAChromosome currentChromosome = new GAChromosome(
-            aiController.valueWeight,
-            aiController.distanceWeight,
-            aiController.weightPenalty
-        );
-        currentChromosome.fitness = aiScore;
+        if (currentIndividualIndex >= population.Count) return;
         
-        // Popülasyona ekle (eğer yoksa)
-        bool found = false;
-        for (int i = 0; i < population.Count; i++)
-        {
-            if (IsSimilar(population[i], currentChromosome))
-            {
-                population[i].fitness = Mathf.Max(population[i].fitness, aiScore);
-                found = true;
-                break;
-            }
-        }
+        GAChromosome current = population[currentIndividualIndex];
+        current.fitness = aiScore;
         
-        if (!found && population.Count < populationSize * 2)
-        {
-            population.Add(currentChromosome);
-        }
+        fitnessHistory.Add(aiScore); // Geçmişe ekle
         
-        Debug.Log($" AI Performansı Kaydedildi: {aiScore} puan");
+        Debug.Log($" Birey {currentIndividualIndex + 1} Fitness: {aiScore}");
         
-        // En iyi kromozomu güncelle
         if (aiScore > bestFitnessEver)
         {
             bestFitnessEver = aiScore;
-            bestChromosomeEver = currentChromosome.Clone();
-            Debug.Log($"YENİ REKOR! En İyi Fitness: {bestFitnessEver}");
-            Debug.Log($"En İyi Kromozom: {bestChromosomeEver}");
+            bestChromosomeEver = current.Clone();
+            Debug.Log($"🏆 YENİ REKOR! {bestFitnessEver}");
         }
         
-        // Her 5 oyunda bir evrim
-        if (population.Count >= populationSize)
-        {
-            EvolvePopulation();
-        }
+        currentIndividualIndex++;
+        
+        // Sıradaki bireyi yükle
+        LoadNextIndividual();
     }
     
-    // Yeni nesil oluştur
     void EvolvePopulation()
     {
-        // Fitness'e göre sırala
         population = population.OrderByDescending(c => c.fitness).ToList();
         
-        // İstatistikleri hesapla
         currentGenerationBest = population[0].fitness;
         currentGenerationAvg = population.Average(c => c.fitness);
         
-        Debug.Log($"");
-        Debug.Log($"=== 🧬 EVRİM: NESİL {currentGeneration} → {currentGeneration + 1} ===");
-        Debug.Log($"📈 En İyi: {population[0]}");
-        Debug.Log($"📉 En Kötü: {population[population.Count - 1]}");
-        Debug.Log($"📊 Ortalama: {currentGenerationAvg:F0}");
-        Debug.Log($"");
+        Debug.Log($"\n===  EVRİM: NESİL {currentGeneration} → {currentGeneration + 1} ===");
+        Debug.Log($" En İyi: {population[0]}");
+        Debug.Log($" En Kötü: {population[population.Count - 1]}");
+        Debug.Log($" Ortalama: {currentGenerationAvg:F0}\n");
         
         List<GAChromosome> newPopulation = new List<GAChromosome>();
         
-        // 1. Elitizm: En iyileri koru
+        // Elitizm
         for (int i = 0; i < elitismCount && i < population.Count; i++)
         {
             newPopulation.Add(population[i].Clone());
         }
         
-        // 2. Yeni nesil oluştur
+        // Çaprazlama ve Mutasyon
         while (newPopulation.Count < populationSize)
         {
             GAChromosome parent1 = TournamentSelection();
@@ -171,13 +145,8 @@ public class GAManager : MonoBehaviour
         }
         
         population = newPopulation;
-        currentGeneration++;
-        
-        // Yeni neslin en iyi kromozomunu AI'a yükle
-        LoadBestChromosome();
     }
     
-    // Turnuva seçimi
     GAChromosome TournamentSelection()
     {
         int tournamentSize = 3;
@@ -196,12 +165,18 @@ public class GAManager : MonoBehaviour
         return best;
     }
     
-    // İki kromozom benzer mi?
-    bool IsSimilar(GAChromosome a, GAChromosome b)
+    // Fitness geçmişini göster
+    public string GetFitnessHistory()
     {
-        float threshold = 0.1f;
-        return Mathf.Abs(a.valueWeight - b.valueWeight) < threshold &&
-               Mathf.Abs(a.distanceWeight - b.distanceWeight) < threshold &&
-               Mathf.Abs(a.weightPenalty - b.weightPenalty) < threshold;
+        if (fitnessHistory.Count == 0) return "Henüz veri yok";
+        
+        string history = "Son 10 Oyun Fitness:\n";
+        int start = Mathf.Max(0, fitnessHistory.Count - 10);
+        for (int i = start; i < fitnessHistory.Count; i++)
+        {
+            history += $"Oyun {i + 1}: {fitnessHistory[i]:F0}\n";
+        }
+        
+        return history;
     }
 }
